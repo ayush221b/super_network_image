@@ -1,7 +1,4 @@
 library super_network_image;
 
-/// A Calculator.
-class Calculator {
-  /// Returns [value] plus 1.
-  int addOne(int value) => value + 1;
-}
+export 'src/super_network_image_widget.dart';
+export 'src/super_network_image_cache.dart';
