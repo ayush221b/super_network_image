@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -51,10 +52,28 @@ class _SuperNetworkImageState extends State<SuperNetworkImage> {
     _imageFuture = _loadImage(widget.url);
   }
 
+  String _appendCacheBustingQuery(String url, int version) {
+    if (version == 0) {
+      return url;
+    }
+    final uri = Uri.parse(url);
+    final queryParameters = Map<String, String>.from(uri.queryParameters);
+    queryParameters['cb'] = version.toString();
+    final newUri = uri.replace(queryParameters: queryParameters);
+    return newUri.toString();
+  }
+
   Future<Widget> _loadImage(String url) async {
     final cacheManager = widget.cache
         ? SuperNetworkImageCacheManager.instance
         : DefaultCacheManager();
+
+    // Apply cache busting on web if needed
+    if (kIsWeb && widget.cache) {
+      final cacheBustingVersion = await SuperNetworkImageCacheManager.instance
+          .getCacheBustingVersion(url);
+      url = _appendCacheBustingQuery(url, cacheBustingVersion);
+    }
 
     // Try to get the file from cache
     FileInfo? fileInfo = await cacheManager.getFileFromCache(url);

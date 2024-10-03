@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
@@ -15,6 +16,9 @@ class SuperNetworkImageCacheManager extends CacheManager {
 
   // Completer to handle async initialization
   static Completer<void>? _prefsCompleter;
+
+  // Prefix for cache busting versions
+  static const String _cacheBustingVersionPrefix = 'cacheBustingVersion_';
 
   factory SuperNetworkImageCacheManager() {
     _instance ??= SuperNetworkImageCacheManager._internal();
@@ -61,6 +65,52 @@ class SuperNetworkImageCacheManager extends CacheManager {
     }
   }
 
+  // Get cache busting version for a specific URL
+  Future<int> getCacheBustingVersion(String url) async {
+    await _ensurePrefsReady();
+    return _sharedPreferences!.getInt('$_cacheBustingVersionPrefix$url') ?? 0;
+  }
+
+  // Initialise a version for cache busting
+  Future<void> _initCacheBustingVersion(String url) async {
+    await _ensurePrefsReady();
+    await _sharedPreferences!.setInt(
+      '$_cacheBustingVersionPrefix$url',
+      0,
+    );
+  }
+
+  // Increment cache busting version for a specific URL
+  Future<void> _incrementCacheBustingVersion(String url) async {
+    await _ensurePrefsReady();
+    int version = await getCacheBustingVersion(url);
+    version++;
+    await _sharedPreferences!
+        .setInt('$_cacheBustingVersionPrefix$url', version);
+  }
+
+  // Increment cache busting versions for all URLs associated with a tag
+  Future<void> _incrementCacheBustingVersionsForTag(String tag) async {
+    final urls = await _getUrlsForTag(tag);
+    for (final url in urls) {
+      await _incrementCacheBustingVersion(url);
+    }
+  }
+
+  // Increment cache busting versions for all images (used in emptyCache)
+  Future<void> _incrementCacheBustingVersionsForAllImages() async {
+    await _ensurePrefsReady();
+    final prefs = _sharedPreferences!;
+    final keys = prefs.getKeys();
+    for (final key in keys) {
+      if (key.startsWith(_cacheBustingVersionPrefix)) {
+        // Get URL from key
+        final url = key.substring(_cacheBustingVersionPrefix.length);
+        await _incrementCacheBustingVersion(url);
+      }
+    }
+  }
+
   Future<void> _addUrlToTag(String tag, String url) async {
     await _ensurePrefsReady();
     final prefs = _sharedPreferences!;
@@ -86,29 +136,46 @@ class SuperNetworkImageCacheManager extends CacheManager {
     await prefs.remove(tagKey);
   }
 
-  Future<void> clearCacheForTag(String tag) async {
-    final urls = await _getUrlsForTag(tag);
-    for (final url in urls) {
-      await removeFile(url);
-    }
-    await _removeTag(tag);
-  }
-
   Future<void> putFileWithTag(
     String url,
     Uint8List fileBytes, {
-    String? eTag,
     required Duration maxAge,
     String? tag,
   }) async {
     await putFile(
       url,
       fileBytes,
-      eTag: eTag,
       maxAge: maxAge,
     );
     if (tag != null) {
       await _addUrlToTag(tag, url);
+    }
+    if (kIsWeb) {
+      _initCacheBustingVersion(url);
+    }
+  }
+
+  @override
+  Future<void> emptyCache() async {
+    if (kIsWeb) {
+      // On web, increment cache busting versions for all images
+      await _incrementCacheBustingVersionsForAllImages();
+    } else {
+      // On mobile platforms, proceed with normal cache clearing
+      await super.emptyCache();
+    }
+  }
+
+  Future<void> clearCacheForTag(String tag) async {
+    if (kIsWeb) {
+      // Increment cache busting versions for images with this tag
+      await _incrementCacheBustingVersionsForTag(tag);
+    } else {
+      final urls = await _getUrlsForTag(tag);
+      for (final url in urls) {
+        await removeFile(url);
+      }
+      await _removeTag(tag);
     }
   }
 
@@ -123,18 +190,23 @@ class SuperNetworkImageCacheManager extends CacheManager {
   }
 
   Future<void> clearSpecificImage(String url) async {
-    await removeFile(url);
-    await _ensurePrefsReady();
-    final prefs = _sharedPreferences!;
-    final keys = prefs.getKeys().where((key) => key.startsWith('tag_'));
-    for (final key in keys) {
-      final urls = prefs.getStringList(key) ?? [];
-      if (urls.contains(url)) {
-        urls.remove(url);
-        if (urls.isEmpty) {
-          await prefs.remove(key);
-        } else {
-          await prefs.setStringList(key, urls);
+    if (kIsWeb) {
+      // Increment cache busting version for this image
+      await _incrementCacheBustingVersion(url);
+    } else {
+      await removeFile(url);
+      await _ensurePrefsReady();
+      final prefs = _sharedPreferences!;
+      final keys = prefs.getKeys().where((key) => key.startsWith('tag_'));
+      for (final key in keys) {
+        final urls = prefs.getStringList(key) ?? [];
+        if (urls.contains(url)) {
+          urls.remove(url);
+          if (urls.isEmpty) {
+            await prefs.remove(key);
+          } else {
+            await prefs.setStringList(key, urls);
+          }
         }
       }
     }
