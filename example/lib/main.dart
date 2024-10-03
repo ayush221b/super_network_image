@@ -12,7 +12,9 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set a global cache duration (optional)
-  SuperNetworkImageCache.setGlobalCacheDuration(const Duration(days: 7));
+  SuperNetworkImageCache.configure(
+    duration: const Duration(days: 7),
+  );
 
   runApp(SuperNetworkImageExampleApp());
 }

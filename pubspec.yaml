@@ -1,6 +1,6 @@
 name: super_network_image
 description: A Flutter widget for loading and caching network images, supporting both raster and SVG formats with advanced caching capabilities.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/ayush221b/super_network_image
 repository: https://github.com/ayush221b/super_network_image
 

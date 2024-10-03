@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'dart:async';
 
 class SuperNetworkImageCacheManager extends CacheManager {
-  static const key = 'superNetworkImageCache';
+  static String _key = 'superNetworkImageCache';
 
   static Duration cacheDuration = const Duration(days: 30);
 
@@ -28,7 +28,7 @@ class SuperNetworkImageCacheManager extends CacheManager {
   SuperNetworkImageCacheManager._internal()
       : super(
           Config(
-            key,
+            _key,
             stalePeriod: cacheDuration,
             maxNrOfCacheObjects: 200,
           ),
@@ -45,8 +45,17 @@ class SuperNetworkImageCacheManager extends CacheManager {
     return _instance!;
   }
 
-  void setGlobalCacheDuration(Duration duration) {
-    cacheDuration = duration;
+  void configure({
+    String? cacheKey,
+    Duration? duration,
+  }) {
+    if (cacheKey != null && cacheKey.trim().isNotEmpty) {
+      _key = cacheKey;
+    }
+    if (duration != null) {
+      cacheDuration = duration;
+    }
+
     // Reconfigure the cache manager with the new duration
     _instance = SuperNetworkImageCacheManager._internal();
   }

@@ -23,7 +23,7 @@ Add `super_network_image` to your project's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  super_network_image: 0.0.1
+  super_network_image: 0.0.2
 ```
 
 Then run:
@@ -79,7 +79,9 @@ Set a global cache duration:
 
 ```dart
 void main() {
-  SuperNetworkImageCache.setGlobalCacheDuration(Duration(days: 7));
+  SuperNetworkImageCache.configure(
+    duration: const Duration(days: 7),
+  );
   runApp(MyApp());
 }
 ```
